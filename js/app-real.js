@@ -179,7 +179,7 @@ async function handleAuth() {
                 return;
             }
             
-            // Crear usuario
+            // Crear usuario en IndexedDB
             const newUser = {
                 name,
                 email,
@@ -189,20 +189,36 @@ async function handleAuth() {
                 createdAt: Date.now()
             };
             
-            await nexusAPI.db.users.add(newUser);
-            user = newUser;
-            await nexusAPI.setUser(user);
-            
-        } else {
-            // Buscar usuario
-            const existingUser = await nexusAPI.db.users.where('email').equals(email).first();
-            if (!existingUser) {
-                alert("Usuario no encontrado. Regístrate primero.");
+            try {
+                const id = await nexusAPI.db.users.add(newUser);
+                console.log('Usuario creado con ID:', id);
+                user = { ...newUser, id };
+                await nexusAPI.setUser(user);
+                alert('¡Cuenta creada exitosamente!');
+            } catch (dbError) {
+                console.error('Error creando usuario:', dbError);
+                alert('Error creando cuenta: ' + dbError.message);
                 return;
             }
             
-            user = existingUser;
-            await nexusAPI.setUser(user);
+        } else {
+            // Buscar usuario en IndexedDB
+            try {
+                const existingUser = await nexusAPI.db.users.where('email').equals(email).first();
+                if (!existingUser) {
+                    alert("Usuario no encontrado. Regístrate primero.");
+                    return;
+                }
+                
+                user = existingUser;
+                await nexusAPI.setUser(user);
+                console.log('Usuario encontrado:', user);
+                
+            } catch (dbError) {
+                console.error('Error buscando usuario:', dbError);
+                alert('Error iniciando sesión: ' + dbError.message);
+                return;
+            }
         }
         
         document.getElementById('authOverlay').style.display = 'none';
@@ -210,6 +226,7 @@ async function handleAuth() {
         init();
         
     } catch (error) {
+        console.error('Error en autenticación:', error);
         alert("Error en la autenticación: " + error.message);
     }
 }
@@ -296,49 +313,68 @@ function setAvatar(el, u) {
 // ==================== VIDEOS ====================
 async function renderHome() {
     try {
+        console.log('Renderizando videos...');
         const videos = await nexusAPI.getVideos();
         const container = document.getElementById('homePage');
         
-        container.innerHTML = videos.map(video => `
-            <div class="video-card">
-                <video src="${video.videoUrl}" controls preload="metadata"></video>
-                <div class="v-body">
-                    <div class="avatar-v" style="background:${video.authorColor}">
-                        ${video.authorAvatar ? 
-                            `<img src="${video.authorAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
-                            (video.authorName || 'U')[0]}
+        console.log('Videos obtenidos:', videos.length);
+        
+        if (videos.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">No hay videos aún. ¡Sé el primero en subir!</div>';
+            return;
+        }
+        
+        container.innerHTML = videos.map(video => {
+            const isOwnVideo = video.author === (user ? user.email : null);
+            const likesCount = video.likes ? video.likes.length : 0;
+            const commentsCount = video.comments ? video.comments.length : 0;
+            const isLiked = user && user.email !== 'guest@nexus.local' && video.likes && video.likes.includes(user.email);
+            
+            return `
+                <div class="video-card">
+                    <video src="${video.videoUrl}" controls preload="metadata"></video>
+                    <div class="v-body">
+                        <div class="avatar-v" style="background:${video.authorColor || '#333'}">
+                            ${video.authorAvatar ? 
+                                `<img src="${video.authorAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
+                                (video.authorName || 'U')[0]}
+                        </div>
+                        <div style="flex:1">
+                            <b>${escapeHtml(video.title)}</b><br>
+                            <small style="color:#666">${escapeHtml(video.authorName || 'Usuario')} • ${timeAgo(video.createdAt)}</small>
+                        </div>
+                        ${isOwnVideo ? 
+                            `<button class="del-btn-mini" onclick="deleteVideo('${video.id}')">Borrar</button>` : 
+                            `<button onclick="followUser('${video.author}')" style="background:var(--blue); color:white; border:none; padding:6px 15px; border-radius:10px; font-weight:600; font-size:12px">
+                                Siguiendo
+                            </button>`
+                        }
                     </div>
-                    <div style="flex:1">
-                        <b>${escapeHtml(video.title)}</b><br>
-                        <small style="color:#666">${escapeHtml(video.authorName || 'Usuario')} • ${timeAgo(video.createdAt)}</small>
+                    <div class="v-actions">
+                        <div class="act-group">
+                            <button class="act-btn ${isLiked ? 'active-l' : ''}" onclick="toggleLike('${video.id}', this)">
+                                <i class="fas fa-heart"></i>
+                                <span>${formatNumber(likesCount)}</span>
+                            </button>
+                            <button class="act-btn" onclick="openComments('${video.id}')">
+                                <i class="fas fa-comment"></i>
+                                <span>${formatNumber(commentsCount)}</span>
+                            </button>
+                            <button class="act-btn" onclick="shareVideo('${video.id}')">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
                     </div>
-                    ${video.author === (user ? user.email : null) ? 
-                        `<button class="del-btn-mini" onclick="deleteVideo('${video.id}')">Borrar</button>` : 
-                        `<button onclick="followUser('${video.author}')" style="background:var(--blue); color:white; border:none; padding:6px 15px; border-radius:10px; font-weight:600; font-size:12px">
-                            ${isFollowing(video.author) ? 'Siguiendo' : 'Seguir'}
-                        </button>`
-                    }
                 </div>
-                <div class="v-actions">
-                    <div class="act-group">
-                        <button class="act-btn ${isLikedByUser(video)?'active-l':''}" onclick="toggleLike('${video.id}', this)">
-                            <i class="fas fa-heart"></i>
-                            <span>${formatNumber(video.likes ? video.likes.length : 0)}</span>
-                        </button>
-                        <button class="act-btn" onclick="openComments('${video.id}')">
-                            <i class="fas fa-comment"></i>
-                            <span>${formatNumber(video.comments ? video.comments.length : 0)}</span>
-                        </button>
-                        <button class="act-btn" onclick="shareVideo('${video.id}')">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+        
+        console.log('Videos renderizados correctamente');
         
     } catch (error) {
         console.error('Error cargando videos:', error);
+        const container = document.getElementById('homePage');
+        container.innerHTML = '<div style="text-align: center; padding: 50px; color: #ff3b30;">Error cargando videos. Recarga la página.</div>';
     }
 }
 
@@ -358,44 +394,69 @@ async function upContent() {
             return;
         }
         
+        console.log('Iniciando upload de video...');
+        
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const videoData = {
-                title,
-                description: '',
-                videoUrl: e.target.result,
-                type,
-                author: user.email,
-                authorName: user.name,
-                authorAvatar: user.pfp,
-                authorColor: user.color,
-                likes: [],
-                comments: [],
-                views: 0,
-                createdAt: Date.now()
-            };
-            
             try {
-                await nexusAPI.uploadVideo(videoData);
-                alert("Video subido exitosamente");
-                closeModal('uploadModal');
-                renderHome();
-            } catch (dbError) {
-                console.error('Error guardando video:', dbError);
-                alert("Error guardando video: " + dbError.message);
+                console.log('Archivo leído, tamaño:', e.target.result.length);
+                
+                const videoData = {
+                    title,
+                    description: '',
+                    videoUrl: e.target.result,
+                    type,
+                    author: user.email,
+                    authorName: user.name,
+                    authorAvatar: user.pfp,
+                    authorColor: user.color,
+                    likes: [],
+                    comments: [],
+                    views: 0,
+                    createdAt: Date.now()
+                };
+                
+                console.log('Guardando video en IndexedDB...', videoData);
+                
+                try {
+                    const id = await nexusAPI.db.videos.add(videoData);
+                    console.log('Video guardado con ID:', id);
+                    
+                    // Broadcast a otros usuarios
+                    await nexusAPI.broadcast('new_video', { video: videoData });
+                    
+                    alert("✅ Video subido exitosamente");
+                    closeModal('uploadModal');
+                    
+                    // Limpiar formulario
+                    document.getElementById('vFile').value = '';
+                    document.getElementById('vTitle').value = '';
+                    
+                    // Refrescar la vista
+                    await renderHome();
+                    
+                } catch (dbError) {
+                    console.error('Error guardando video en IndexedDB:', dbError);
+                    alert("❌ Error guardando video: " + dbError.message);
+                }
+                
+            } catch (processError) {
+                console.error('Error procesando archivo:', processError);
+                alert("❌ Error procesando archivo: " + processError.message);
             }
         };
         
         reader.onerror = (fileError) => {
             console.error('Error leyendo archivo:', fileError);
-            alert("Error leyendo el archivo: " + fileError.message);
+            alert("❌ Error leyendo el archivo: " + fileError.message);
         };
         
+        // Iniciar lectura del archivo
         reader.readAsDataURL(file);
         
     } catch (error) {
-        console.error('Error subiendo video:', error);
-        alert("Error subiendo video: " + error.message);
+        console.error('Error general en upload:', error);
+        alert("❌ Error subiendo video: " + error.message);
     }
 }
 
@@ -419,16 +480,56 @@ async function toggleLike(videoId, button) {
             return;
         }
         
-        await nexusAPI.likeVideo(videoId, user.email);
+        console.log('Dando like al video:', videoId);
         
-        // Actualizar UI
-        button.classList.toggle('active-l');
-        const span = button.querySelector('span');
-        const currentCount = parseInt(span.textContent) || 0;
-        span.textContent = formatNumber(button.classList.contains('active-l') ? currentCount + 1 : currentCount - 1);
+        // Obtener video actual
+        const video = await nexusAPI.db.videos.where('id').equals(videoId).first();
+        if (!video) {
+            console.error('Video no encontrado:', videoId);
+            return;
+        }
+        
+        // Verificar si ya dio like
+        const alreadyLiked = video.likes && video.likes.includes(user.email);
+        
+        if (alreadyLiked) {
+            // Quitar like
+            video.likes = video.likes.filter(email => email !== user.email);
+            await nexusAPI.db.videos.update(videoId, { likes: video.likes });
+            
+            // Broadcast unlike
+            await nexusAPI.broadcast('client-unlike_video', { 
+                videoId, 
+                userId: user.email 
+            });
+            
+            button.classList.remove('active-l');
+            const span = button.querySelector('span');
+            const currentCount = parseInt(span.textContent) || 0;
+            span.textContent = formatNumber(currentCount - 1);
+            
+        } else {
+            // Agregar like
+            video.likes = (video.likes || []).concat(user.email);
+            await nexusAPI.db.videos.update(videoId, { likes: video.likes });
+            
+            // Broadcast like
+            await nexusAPI.broadcast('client-like_video', { 
+                videoId, 
+                userId: user.email 
+            });
+            
+            button.classList.add('active-l');
+            const span = button.querySelector('span');
+            const currentCount = parseInt(span.textContent) || 0;
+            span.textContent = formatNumber(currentCount + 1);
+        }
+        
+        console.log('Like actualizado:', video.likes);
         
     } catch (error) {
         console.error('Error dando like:', error);
+        alert('Error dando like: ' + error.message);
     }
 }
 
@@ -449,22 +550,49 @@ async function followUser(userEmail) {
             return;
         }
         
-        await nexusAPI.followUser(user.email, userEmail);
-        alert(userEmail === 'following' ? 'Dejaste de seguir' : '¡Siguiendo!');
+        console.log('Siguiendo al usuario:', userEmail);
+        
+        // Verificar si ya sigue
+        const alreadyFollowing = await nexusAPI.db.follows
+            .where('followerId').equals(user.email)
+            .and(follow => follow.followingId === userEmail)
+            .first();
+        
+        if (alreadyFollowing) {
+            // Dejar de seguir
+            await nexusAPI.db.follows.delete(alreadyFollowing.id);
+            
+            // Broadcast unfollow
+            await nexusAPI.broadcast('client-unfollow_user', { 
+                followerId: user.email, 
+                followingId: userEmail 
+            });
+            
+            alert('Dejaste de seguir');
+            
+        } else {
+            // Seguir
+            await nexusAPI.db.follows.add({
+                followerId: user.email,
+                followingId: userEmail,
+                createdAt: Date.now()
+            });
+            
+            // Broadcast follow
+            await nexusAPI.broadcast('client-follow_user', { 
+                followerId: user.email, 
+                followingId: userEmail 
+            });
+            
+            alert('¡Siguiendo!');
+        }
+        
+        // Refrescar la vista
         renderHome();
         
     } catch (error) {
         console.error('Error siguiendo usuario:', error);
-    }
-}
-
-async function isFollowing(userEmail) {
-    if (!user) return false;
-    try {
-        const follows = await nexusAPI.db.follows.where('followerId').equals(user.email).toArray();
-        return follows.some(f => f.followingId === userEmail);
-    } catch (error) {
-        return false;
+        alert('Error siguiendo usuario: ' + error.message);
     }
 }
 
@@ -515,6 +643,8 @@ async function postComment() {
             return;
         }
         
+        console.log('Agregando comentario al video:', activeVidId);
+        
         const commentData = {
             name: user.name,
             email: user.email,
@@ -524,12 +654,31 @@ async function postComment() {
             createdAt: Date.now()
         };
         
-        await nexusAPI.commentVideo(activeVidId, commentData);
+        // Obtener video actual
+        const video = await nexusAPI.db.videos.where('id').equals(activeVidId).first();
+        if (!video) {
+            console.error('Video no encontrado para comentar:', activeVidId);
+            return;
+        }
+        
+        // Agregar comentario al video
+        video.comments = (video.comments || []).concat(commentData);
+        await nexusAPI.db.videos.update(activeVidId, { comments: video.comments });
+        
+        // Broadcast del comentario
+        await nexusAPI.broadcast('client-comment_video', { 
+            comment: commentData, 
+            videoId: activeVidId 
+        });
+        
+        console.log('Comentario agregado:', commentData);
+        
         input.value = '';
         renderComments();
         
     } catch (error) {
         console.error('Error comentando:', error);
+        alert('Error comentando: ' + error.message);
     }
 }
 

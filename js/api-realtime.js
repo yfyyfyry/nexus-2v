@@ -37,44 +37,44 @@ class NexusAPI {
             // Suscribirse al canal principal de Nexus
             this.channel = this.pusher.subscribe('nexus-global');
             
-            // Eventos de videos
-            this.channel.bind('new_video', (data) => {
+            // Eventos de videos (deben empezar con 'client-')
+            this.channel.bind('client-new_video', (data) => {
                 console.log('📹 Nuevo video recibido:', data);
                 this.handleRealtimeUpdate({ type: 'new_video', video: data });
             });
             
             // Eventos de likes
-            this.channel.bind('new_like', (data) => {
+            this.channel.bind('client-new_like', (data) => {
                 console.log('❤️ Nuevo like recibido:', data);
                 this.handleRealtimeUpdate({ type: 'new_like', like: data });
             });
             
             // Eventos de follows
-            this.channel.bind('new_follow', (data) => {
+            this.channel.bind('client-new_follow', (data) => {
                 console.log('👥 Nuevo follow recibido:', data);
                 this.handleRealtimeUpdate({ type: 'new_follow', follow: data });
             });
             
             // Eventos de comentarios
-            this.channel.bind('new_comment', (data) => {
+            this.channel.bind('client-new_comment', (data) => {
                 console.log('💬 Nuevo comentario recibido:', data);
                 this.handleRealtimeUpdate({ type: 'new_comment', comment: data.comment, videoId: data.videoId });
             });
             
             // Eventos de stories
-            this.channel.bind('new_story', (data) => {
+            this.channel.bind('client-new_story', (data) => {
                 console.log('📸 Nuevo story recibido:', data);
                 this.handleRealtimeUpdate({ type: 'new_story', story: data });
             });
             
             // Eventos de eliminación
-            this.channel.bind('delete_video', (data) => {
+            this.channel.bind('client-delete_video', (data) => {
                 console.log('🗑️ Video eliminado:', data);
                 this.handleRealtimeUpdate({ type: 'delete_video', videoId: data.videoId });
             });
             
             // Eventos de estado de usuarios
-            this.channel.bind('user_status', (data) => {
+            this.channel.bind('client-user_status', (data) => {
                 console.log('👤 Usuario conectado:', data);
             });
             
@@ -122,22 +122,115 @@ class NexusAPI {
 
     // Manejar actualizaciones en tiempo real
     async handleRealtimeUpdate(data) {
+        console.log(' Recibido evento:', data.type, data);
+        
         switch (data.type) {
             case 'new_video':
                 await this.syncVideo(data.video);
                 break;
-            case 'new_like':
-                await this.syncLike(data.like);
+            case 'like_video':
+                await this.syncLike(data);
                 break;
-            case 'new_follow':
-                await this.syncFollow(data.follow);
+            case 'unlike_video':
+                await this.syncUnlike(data);
                 break;
-            case 'new_comment':
-                await this.syncComment(data.comment);
+            case 'follow_user':
+                await this.syncFollow(data);
+                break;
+            case 'unfollow_user':
+                await this.syncUnfollow(data);
+                break;
+            case 'comment_video':
+                await this.syncComment(data.comment, data.videoId);
                 break;
             case 'new_story':
                 await this.syncStory(data.story);
                 break;
+            case 'delete_video':
+                await this.syncDeleteVideo(data.videoId);
+                break;
+        }
+    }
+
+    // Sincronizar like
+    async syncLike(data) {
+        try {
+            const video = await this.db.videos.where('id').equals(data.videoId).first();
+            if (video && data.userId) {
+                video.likes = (video.likes || []).concat(data.userId);
+                await this.db.videos.update(data.videoId, { likes: video.likes });
+                this.notifyNewContent('like', data);
+            }
+        } catch (error) {
+            console.error('Error sincronizando like:', error);
+        }
+    }
+
+    // Sincronizar unlike
+    async syncUnlike(data) {
+        try {
+            const video = await this.db.videos.where('id').equals(data.videoId).first();
+            if (video && data.userId) {
+                video.likes = (video.likes || []).filter(email => email !== data.userId);
+                await this.db.videos.update(data.videoId, { likes: video.likes });
+                this.notifyNewContent('unlike', data);
+            }
+        } catch (error) {
+            console.error('Error sincronizando unlike:', error);
+        }
+    }
+
+    // Sincronizar follow
+    async syncFollow(data) {
+        try {
+            await this.db.follows.add({
+                followerId: data.followerId,
+                followingId: data.followingId,
+                createdAt: Date.now()
+            });
+            this.notifyNewContent('follow', data);
+        } catch (error) {
+            console.error('Error sincronizando follow:', error);
+        }
+    }
+
+    // Sincronizar unfollow
+    async syncUnfollow(data) {
+        try {
+            const follow = await this.db.follows
+                .where('followerId').equals(data.followerId)
+                .and(follow => follow.followingId === data.followingId)
+                .first();
+            if (follow) {
+                await this.db.follows.delete(follow.id);
+                this.notifyNewContent('unfollow', data);
+            }
+        } catch (error) {
+            console.error('Error sincronizando unfollow:', error);
+        }
+    }
+
+    // Sincronizar comentario
+    async syncComment(commentData, videoId) {
+        try {
+            const video = await this.db.videos.where('id').equals(videoId).first();
+            if (video) {
+                video.comments = (video.comments || []).concat(commentData);
+                await this.db.videos.update(videoId, { comments: video.comments });
+                this.notifyNewContent('comment', { comment: commentData, videoId });
+            }
+        } catch (error) {
+            console.error('Error sincronizando comentario:', error);
+        }
+    }
+
+    // Sincronizar eliminación de video
+    async syncDeleteVideo(videoId) {
+        try {
+            await this.db.videos.delete(videoId);
+            this.notifyNewContent('delete_video', { videoId });
+        } catch (error) {
+            console.error('Error sincronizando eliminación:', error);
         }
     }
 
