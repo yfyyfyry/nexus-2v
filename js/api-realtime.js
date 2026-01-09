@@ -44,21 +44,33 @@ class NexusAPI {
             });
             
             // Eventos de likes
-            this.channel.bind('client-new_like', (data) => {
+            this.channel.bind('client-like_video', (data) => {
                 console.log('❤️ Nuevo like recibido:', data);
-                this.handleRealtimeUpdate({ type: 'new_like', like: data });
+                this.handleRealtimeUpdate({ type: 'like_video', data });
+            });
+            
+            // Eventos de unlike
+            this.channel.bind('client-unlike_video', (data) => {
+                console.log('💔 Unlike recibido:', data);
+                this.handleRealtimeUpdate({ type: 'unlike_video', data });
             });
             
             // Eventos de follows
-            this.channel.bind('client-new_follow', (data) => {
+            this.channel.bind('client-follow_user', (data) => {
                 console.log('👥 Nuevo follow recibido:', data);
-                this.handleRealtimeUpdate({ type: 'new_follow', follow: data });
+                this.handleRealtimeUpdate({ type: 'follow_user', data });
+            });
+            
+            // Eventos de unfollow
+            this.channel.bind('client-unfollow_user', (data) => {
+                console.log('👋 Unfollow recibido:', data);
+                this.handleRealtimeUpdate({ type: 'unfollow_user', data });
             });
             
             // Eventos de comentarios
-            this.channel.bind('client-new_comment', (data) => {
+            this.channel.bind('client-comment_video', (data) => {
                 console.log('💬 Nuevo comentario recibido:', data);
-                this.handleRealtimeUpdate({ type: 'new_comment', comment: data.comment, videoId: data.videoId });
+                this.handleRealtimeUpdate({ type: 'comment_video', comment: data.comment, videoId: data.videoId });
             });
             
             // Eventos de stories

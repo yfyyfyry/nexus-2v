@@ -7,70 +7,274 @@ let isMobile = false;
 
 // Detectar dispositivo
 function detectDevice() {
-    const userAgent = navigator.userAgent.toLowerCase();
-    const screenWidth = window.innerWidth;
-    isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent) || screenWidth <= 768;
-    return isMobile ? 'móvil' : 'PC/laptop';
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isTablet = /iPad|Android(?!.*Mobile)|Tablet/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        return 'mobile';
+    } else if (isTablet) {
+        return 'tablet';
+    } else {
+        return 'pc';
+    }
 }
 
 // Mostrar selector de dispositivo al cargar
-function showDeviceSelector() {
-    const device = detectDevice();
-    
-    const selectorDiv = document.createElement('div');
-    selectorDiv.style.cssText = `
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-        background: linear-gradient(135deg, #1a1a1a, #2d2d2d); color: white; 
-        padding: 30px; border-radius: 20px; z-index: 10000;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-        text-align: center; min-width: 300px;
-        border: 1px solid #333;
+function showDeviceSelection() {
+    const modal = document.createElement('div');
+    modal.id = 'deviceModal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     `;
-    selectorDiv.innerHTML = `
-        <h2 style="margin: 0 0 20px 0; color: var(--blue);">📱 ¿Desde dónde nos visitas?</h2>
-        <p style="margin: 0 0 25px 0; color: #888; font-size: 14px;">
-            Detectamos que estás usando: <strong>${device}</strong>
-        </p>
-        <div style="display: flex; gap: 15px; justify-content: center;">
-            <button onclick="setDeviceMode('mobile')" style="
-                background: linear-gradient(45deg, #ff0050, #ff4500); 
-                color: white; border: none; padding: 12px 20px; 
-                border-radius: 12px; cursor: pointer; font-weight: bold;
-                transition: transform 0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                📱 Móvil
-            </button>
-            <button onclick="setDeviceMode('desktop')" style="
-                background: linear-gradient(45deg, #0095f6, #00d4ff); 
-                color: white; border: none; padding: 12px 20px; 
-                border-radius: 12px; cursor: pointer; font-weight: bold;
-                transition: transform 0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                💻 PC/Laptop
-            </button>
+    
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 20px; padding: 40px; text-align: center; max-width: 400px; width: 90%;">
+            <h2 style="margin: 0 0 20px 0; color: #333; font-size: 24px;">¿Desde dónde ves Nexus?</h2>
+            <p style="margin: 0 0 30px 0; color: #666; font-size: 16px;">Selecciona tu dispositivo para la mejor experiencia</p>
+            
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <button onclick="selectDevice('mobile')" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white; border: none; padding: 15px 25px; border-radius: 15px;
+                    font-size: 16px; font-weight: 600; cursor: pointer;
+                    transition: transform 0.2s, box-shadow 0.2s;
+                    display: flex; align-items: center; gap: 10px;
+                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-mobile-alt"></i>
+                    Móvil
+                </button>
+                
+                <button onclick="selectDevice('tablet')" style="
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    color: white; border: none; padding: 15px 25px; border-radius: 15px;
+                    font-size: 16px; font-weight: 600; cursor: pointer;
+                    transition: transform 0.2s, box-shadow 0.2s;
+                    display: flex; align-items: center; gap: 10px;
+                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-tablet-alt"></i>
+                    Tablet
+                </button>
+                
+                <button onclick="selectDevice('pc')" style="
+                    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                    color: white; border: none; padding: 15px 25px; border-radius: 15px;
+                    font-size: 16px; font-weight: 600; cursor: pointer;
+                    transition: transform 0.2s, box-shadow 0.2s;
+                    display: flex; align-items: center; gap: 10px;
+                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-desktop"></i>
+                    PC
+                </button>
+            </div>
+            
+            <p style="margin: 20px 0 0 0; color: #999; font-size: 12px;">
+                Puedes cambiar esto después en Configuración
+            </p>
         </div>
     `;
-    document.body.appendChild(selectorDiv);
+    
+    document.body.appendChild(modal);
 }
 
-// Establecer modo de dispositivo
-function setDeviceMode(mode) {
-    isMobile = mode === 'mobile';
-    localStorage.setItem('nexus_device_mode', mode);
+// Seleccionar dispositivo
+function selectDevice(device) {
+    localStorage.setItem('nexus_device', device);
+    applyDeviceStyles(device);
+    document.getElementById('deviceModal').remove();
+    init();
+}
+
+// Aplicar estilos de dispositivo
+function applyDeviceStyles(device) {
+    const root = document.documentElement;
     
-    if (isMobile) {
-        document.body.classList.add('mobile-mode');
-        document.body.classList.remove('desktop-mode');
+    if (device === 'pc') {
+        // Estilos para PC - Interfaz completa
+        root.style.setProperty('--app-width', '1400px');
+        root.style.setProperty('--header-height', '80px');
+        root.style.setProperty('--nav-height', '70px');
+        root.style.setProperty('--card-width', '400px');
+        root.style.setProperty('--card-height', '500px');
+        root.style.setProperty('--font-size-base', '16px');
+        root.style.setProperty('--spacing-large', '30px');
+        root.style.setProperty('--border-radius', '12px');
+        root.style.setProperty('--shadow', '0 8px 32px rgba(0,0,0,0.1)');
+        
+        // Layout para PC
+        document.body.style.cssText += `
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-size: 16px;
+        `;
+        
+        // Header para PC
+        const header = document.querySelector('.header');
+        if (header) {
+            header.style.cssText += `
+                height: 80px;
+                padding: 0 40px;
+                background: rgba(255,255,255,0.95);
+                backdrop-filter: blur(20px);
+                border-bottom: 1px solid rgba(0,0,0,0.1);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            `;
+        }
+        
+        // Navigation para PC
+        const nav = document.querySelector('nav');
+        if (nav) {
+            nav.style.cssText += `
+                height: 70px;
+                padding: 0 40px;
+                background: rgba(255,255,255,0.95);
+                backdrop-filter: blur(20px);
+                border-top: 1px solid rgba(0,0,0,0.1);
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+                justify-content: center;
+                gap: 40px;
+            `;
+        }
+        
+        // Video cards para PC
+        const style = document.createElement('style');
+        style.textContent = `
+            .video-card {
+                width: 400px !important;
+                height: 500px !important;
+                border-radius: 12px !important;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.1) !important;
+                transition: transform 0.3s, box-shadow 0.3s !important;
+                margin: 15px !important;
+            }
+            
+            .video-card:hover {
+                transform: translateY(-8px) !important;
+                box-shadow: 0 16px 48px rgba(0,0,0,0.15) !important;
+            }
+            
+            .video-card video {
+                height: 250px !important;
+                border-radius: 12px 12px 0 0 !important;
+            }
+            
+            .v-actions {
+                padding: 20px !important;
+                gap: 15px !important;
+            }
+            
+            .act-btn {
+                padding: 12px 20px !important;
+                font-size: 14px !important;
+                border-radius: 10px !important;
+                transition: all 0.3s !important;
+            }
+            
+            .act-btn:hover {
+                transform: scale(1.1) !important;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.2) !important;
+            }
+            
+            .homePage {
+                display: grid !important;
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)) !important;
+                gap: 30px !important;
+                padding: 40px !important;
+                max-width: 1400px !important;
+                margin: 0 auto !important;
+            }
+            
+            .header {
+                max-width: 1400px !important;
+                margin: 0 auto !important;
+            }
+            
+            .nav {
+                max-width: 1400px !important;
+                margin: 0 auto !important;
+            }
+            
+            .story-bar {
+                padding: 20px 40px !important;
+                gap: 20px !important;
+            }
+            
+            .story-avatar {
+                width: 70px !important;
+                height: 70px !important;
+                border-width: 3px !important;
+            }
+            
+            .search-bar {
+                max-width: 600px !important;
+                margin: 0 auto !important;
+                height: 50px !important;
+                font-size: 16px !important;
+                border-radius: 25px !important;
+            }
+            
+            .modal {
+                border-radius: 20px !important;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+            }
+            
+            .upload-modal {
+                max-width: 600px !important;
+                margin: 0 auto !important;
+            }
+            
+            .comment-modal {
+                max-width: 500px !important;
+                margin: 0 auto !important;
+            }
+            
+            /* Scrollbar personalizada para PC */
+            ::-webkit-scrollbar {
+                width: 12px !important;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background: rgba(0,0,0,0.1) !important;
+                border-radius: 6px !important;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                border-radius: 6px !important;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+            }
+        `;
+        document.head.appendChild(style);
+        
+    } else if (device === 'tablet') {
+        // Estilos para Tablet
+        root.style.setProperty('--app-width', '1000px');
+        root.style.setProperty('--header-height', '70px');
+        root.style.setProperty('--nav-height', '60px');
+        root.style.setProperty('--card-width', '300px');
+        root.style.setProperty('--card-height', '400px');
+        root.style.setProperty('--font-size-base', '14px');
+        root.style.setProperty('--spacing-large', '20px');
+        root.style.setProperty('--border-radius', '10px');
+        root.style.setProperty('--shadow', '0 6px 24px rgba(0,0,0,0.08)');
+        
     } else {
-        document.body.classList.add('desktop-mode');
-        document.body.classList.remove('mobile-mode');
+        // Estilos para Móvil (por defecto)
+        root.style.setProperty('--app-width', '100%');
+        root.style.setProperty('--header-height', '60px');
+        root.style.setProperty('--nav-height', '60px');
+        root.style.setProperty('--card-width', '100%');
+        root.style.setProperty('--card-height', 'auto');
+        root.style.setProperty('--font-size-base', '14px');
+        root.style.setProperty('--spacing-large', '15px');
+        root.style.setProperty('--border-radius', '8px');
+        root.style.setProperty('--shadow', '0 4px 16px rgba(0,0,0,0.06)');
     }
-    
-    const selector = document.querySelector('div[style*="position: fixed"]');
-    if (selector) selector.remove();
-    
-    showWelcomeMessage();
-    if (user) init();
 }
 
 // Inicializar cuando cargue la página
@@ -97,7 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             init();
         }
     } else {
-        showDeviceSelector();
+        showDeviceSelection();
     }
     
     // Escuchar actualizaciones en tiempo real
@@ -145,7 +349,7 @@ function showWelcomeMessage() {
         padding: 15px 25px; border-radius: 20px; z-index: 10000;
         font-weight: bold; animation: slideDown 0.5s ease;
     `;
-    welcomeDiv.innerHTML = '🎉 ¡Hola! Bienvenido a Nexus! 🚀 Esta app está en fase beta';
+    welcomeDiv.innerHTML = '¡Hola! Bienvenido a Nexus! Esta app está en fase beta';
     document.body.appendChild(welcomeDiv);
     
     setTimeout(() => welcomeDiv.remove(), 4000);
@@ -344,7 +548,7 @@ async function renderHome() {
                             <small style="color:#666">${escapeHtml(video.authorName || 'Usuario')} • ${timeAgo(video.createdAt)}</small>
                         </div>
                         ${isOwnVideo ? 
-                            `<button class="del-btn-mini" onclick="deleteVideo('${video.id}')">Borrar</button>` : 
+                            `<button class="del-btn-mini" onclick="deleteVideo(${video.id})">Borrar</button>` : 
                             `<button onclick="followUser('${video.author}')" style="background:var(--blue); color:white; border:none; padding:6px 15px; border-radius:10px; font-weight:600; font-size:12px">
                                 Siguiendo
                             </button>`
@@ -352,15 +556,15 @@ async function renderHome() {
                     </div>
                     <div class="v-actions">
                         <div class="act-group">
-                            <button class="act-btn ${isLiked ? 'active-l' : ''}" onclick="toggleLike('${video.id}', this)">
+                            <button class="act-btn ${isLiked ? 'active-l' : ''}" onclick="toggleLike(${video.id}, this)">
                                 <i class="fas fa-heart"></i>
                                 <span>${formatNumber(likesCount)}</span>
                             </button>
-                            <button class="act-btn" onclick="openComments('${video.id}')">
+                            <button class="act-btn" onclick="openComments(${video.id})">
                                 <i class="fas fa-comment"></i>
                                 <span>${formatNumber(commentsCount)}</span>
                             </button>
-                            <button class="act-btn" onclick="shareVideo('${video.id}')">
+                            <button class="act-btn" onclick="shareVideo(${video.id})">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
@@ -422,8 +626,11 @@ async function upContent() {
                     const id = await nexusAPI.db.videos.add(videoData);
                     console.log('Video guardado con ID:', id);
                     
+                    // Agregar el ID al videoData para sincronización
+                    videoData.id = id;
+                    
                     // Broadcast a otros usuarios
-                    await nexusAPI.broadcast('new_video', { video: videoData });
+                    await nexusAPI.broadcast('client-new_video', { video: videoData });
                     
                     alert("✅ Video subido exitosamente");
                     closeModal('uploadModal');
@@ -585,6 +792,9 @@ async function followUser(userEmail) {
             });
             
             alert('¡Siguiendo!');
+            
+            // Abrir chat automáticamente
+            openChatWithUser(userEmail);
         }
         
         // Refrescar la vista
@@ -593,6 +803,173 @@ async function followUser(userEmail) {
     } catch (error) {
         console.error('Error siguiendo usuario:', error);
         alert('Error siguiendo usuario: ' + error.message);
+    }
+}
+
+// ==================== CHAT Y MENSAJERÍA ====================
+async function openChatWithUser(userEmail) {
+    try {
+        // Buscar información del usuario
+        const targetUser = await nexusAPI.db.users.where('email').equals(userEmail).first();
+        if (!targetUser) {
+            alert('Usuario no encontrado');
+            return;
+        }
+        
+        activeChatUserId = targetUser.id;
+        
+        // Actualizar UI del chat
+        document.getElementById('chatUserName').textContent = targetUser.name;
+        setAvatar(document.getElementById('chatUserAvatar'), targetUser);
+        
+        // Cargar mensajes existentes
+        await renderChatMessages();
+        
+        // Abrir modal de chat
+        openModal('chatModal');
+        
+    } catch (error) {
+        console.error('Error abriendo chat:', error);
+        alert('Error abriendo chat: ' + error.message);
+    }
+}
+
+async function renderChatMessages() {
+    try {
+        if (!activeChatUserId || !user) return;
+        
+        const messages = await nexusAPI.db.chats
+            .where('to').equals(user.email)
+            .and('from').equals(getUserEmailById(activeChatUserId))
+            .or('to').equals(getUserEmailById(activeChatUserId))
+            .and('from').equals(user.email))
+            .orderBy('createdAt')
+            .toArray();
+        
+        const container = document.getElementById('chatMessages');
+        container.innerHTML = messages.map(msg => `
+            <div class="chat-message ${msg.from === user.email ? 'sent' : 'received'}">
+                <div class="message-avatar" style="background: ${msg.fromColor || '#333'}">
+                    ${msg.fromAvatar ? 
+                        `<img src="${msg.fromAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
+                        (msg.fromName || 'U')[0]}
+                </div>
+                <div class="message-content">
+                    <div class="message-text">${escapeHtml(msg.content)}</div>
+                    <div class="message-time">${new Date(msg.createdAt).toLocaleTimeString()}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Scroll al final
+        container.scrollTop = container.scrollHeight;
+        
+    } catch (error) {
+        console.error('Error cargando mensajes:', error);
+    }
+}
+
+async function sendMessage() {
+    try {
+        const input = document.getElementById('chatInput');
+        const content = input.value.trim();
+        
+        if (!content || !activeChatUserId || !user) return;
+        
+        const targetUserEmail = getUserEmailById(activeChatUserId);
+        
+        const messageData = {
+            from: user.email,
+            fromName: user.name,
+            fromAvatar: user.pfp,
+            fromColor: user.color,
+            to: targetUserEmail,
+            toName: getUserEmailById(activeChatUserId),
+            content,
+            type: 'text',
+            createdAt: Date.now(),
+            read: false
+        };
+        
+        // Guardar mensaje
+        await nexusAPI.db.chats.add(messageData);
+        
+        // Broadcast del mensaje
+        await nexusAPI.broadcast('client-new_message', messageData);
+        
+        // Limpiar input
+        input.value = '';
+        
+        // Refrescar mensajes
+        await renderChatMessages();
+        
+    } catch (error) {
+        console.error('Error enviando mensaje:', error);
+        alert('Error enviando mensaje: ' + error.message);
+    }
+}
+
+function getUserEmailById(userId) {
+    // Esta función debería buscar el email por ID, pero por ahora usamos un mapeo simple
+    // En una implementación real, esto buscaría en la base de datos
+    return 'user_' + userId + '@nexus.local'; // Placeholder
+}
+
+// ==================== INBOX Y CHATS ====================
+async function renderInbox() {
+    try {
+        if (!user) {
+            document.getElementById('inboxPage').innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">Inicia sesión para ver mensajes</div>';
+            return;
+        }
+        
+        const messages = await nexusAPI.db.chats
+            .where('to').equals(user.email)
+            .orderBy('createdAt')
+            .reverse()
+            .toArray();
+        
+        const container = document.getElementById('inboxPage');
+        
+        if (messages.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">No tienes mensajes</div>';
+            return;
+        }
+        
+        // Agrupar mensajes por usuario
+        const messagesByUser = {};
+        messages.forEach(msg => {
+            const otherUser = msg.from === user.email ? msg.to : msg.from;
+            if (!messagesByUser[otherUser]) {
+                messagesByUser[otherUser] = [];
+            }
+            messagesByUser[otherUser].push(msg);
+        });
+        
+        container.innerHTML = Object.entries(messagesByUser).map(([userEmail, userMessages]) => {
+            const lastMessage = userMessages[0];
+            const unreadCount = userMessages.filter(msg => !msg.read && msg.to === user.email).length;
+            
+            return `
+                <div class="chat-item" onclick="openChatWithUser('${userEmail}')">
+                    <div class="chat-avatar" style="background: ${lastMessage.fromColor || '#333'}">
+                        ${lastMessage.fromAvatar ? 
+                            `<img src="${lastMessage.fromAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
+                            (lastMessage.fromName || 'U')[0]}
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-name">${escapeHtml(lastMessage.fromName || 'Usuario')}</div>
+                        <div class="chat-preview">${escapeHtml(lastMessage.content)}</div>
+                        <div class="chat-time">${timeAgo(lastMessage.createdAt)}</div>
+                    </div>
+                    ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Error cargando inbox:', error);
+        document.getElementById('inboxPage').innerHTML = '<div style="text-align: center; padding: 50px; color: #ff3b30;">Error cargando mensajes</div>';
     }
 }
 
@@ -682,9 +1059,97 @@ async function postComment() {
     }
 }
 
-// ==================== UTILIDADES ====================
-function validEmailFormat(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// ==================== ACTUALIZACIÓN EN TIEMPO REAL ====================
+// Escuchar eventos de sincronización
+window.addEventListener('nexus:new_content', async (event) => {
+    const { type, data } = event.detail;
+    console.log('📡 Evento recibido:', type, data);
+    
+    switch (type) {
+        case 'like':
+            await handleLikeSync(data);
+            break;
+        case 'unlike':
+            await handleUnlikeSync(data);
+            break;
+        case 'comment':
+            await handleCommentSync(data);
+            break;
+        case 'follow':
+            await handleFollowSync(data);
+            break;
+        case 'unfollow':
+            await handleUnfollowSync(data);
+            break;
+        case 'video':
+            await handleVideoSync(data);
+            break;
+        case 'delete_video':
+            await handleDeleteSync(data);
+            break;
+    }
+    
+    // Refrescar la vista principal
+    await renderHome();
+});
+
+// Manejar sincronización de likes
+async function handleLikeSync(data) {
+    if (!user || user.email === data.userId) return; // No actualizar si es el mismo usuario
+    
+    try {
+        const video = await nexusAPI.db.videos.where('id').equals(data.videoId).first();
+        if (video) {
+            video.likes = (video.likes || []).concat(data.userId);
+            await nexusAPI.db.videos.update(data.videoId, { likes: video.likes });
+            console.log('❤️ Like sincronizado:', data);
+        }
+    } catch (error) {
+        console.error('Error sincronizando like:', error);
+    }
+}
+
+// Manejar sincronización de unlike
+async function handleUnlikeSync(data) {
+    if (!user || user.email === data.userId) return; // No actualizar si es el mismo usuario
+    
+    try {
+        const video = await nexusAPI.db.videos.where('id').equals(data.videoId).first();
+        if (video) {
+            video.likes = (video.likes || []).filter(email => email !== data.userId);
+            await nexusAPI.db.videos.update(data.videoId, { likes: video.likes });
+            console.log('💔 Unlike sincronizado:', data);
+        }
+    } catch (error) {
+        console.error('Error sincronizando unlike:', error);
+    }
+}
+
+// Manejar sincronización de comentarios
+async function handleCommentSync(data) {
+    try {
+        const video = await nexusAPI.db.videos.where('id').equals(data.videoId).first();
+        if (video) {
+            video.comments = (video.comments || []).concat(data.comment);
+            await nexusAPI.db.videos.update(data.videoId, { comments: video.comments });
+            console.log('💬 Comentario sincronizado:', data);
+        }
+    } catch (error) {
+        console.error('Error sincronizando comentario:', error);
+    }
+}
+
+// Manejar sincronización de videos
+async function handleVideoSync(data) {
+    try {
+        const existing = await nexusAPI.db.videos.where('id').equals(data.id).first();
+        if (!existing) {
+            await nexusAPI.db.videos.add(data);
+            console.log('📹 Video sincronizado:', data);
+        }
+    } catch (error) {
+        console.error('Error sincronizando video:', error);
+    }
 }
 
 function escapeHtml(str) {
